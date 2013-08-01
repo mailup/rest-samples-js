@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>MailUp Demo Client</title>
+<script src="./mailupclient.js"></script>
+<script>
+        
+var CLIENT_ID = "6a324fe1-5bfa-4b5f-815b-f05d2d7efcd8";
+var CLIENT_SECRET = "f05b406e-deb8-408d-8cfd-8f2a92111dde";
+var CALLBACK_URI = "http://127.0.0.1/index.html";
+        
+</script>
+</head>
+<body>
+<h2>
+MailUp Demo Client
+</h2>
+    <script>
+        
+        
+        
+        // Initialize MailUp
+        var mailUp = new MailUpClient(CLIENT_ID, CLIENT_SECRET, CALLBACK_URI);
+        
+        // Obtain access token
+        var params = window.location.search.slice(1).split("&");
+        for (var i = 0; i < params.length; i++) {
+            var param = params[i].split("=");
+            if (param[0]=="code") { // We have code returned from MailUp
+                var code = param[1];
+                mailUp.retreiveAccessTokenWithCode(code, function(token) {
+                    document.getElementById("pAuthorization").innerHTML = "Authorized. Token: "+token;
+                }, function(error) {
+                    document.getElementById("pAuthorization").innerHTML = "Unauthorized";
+                });
+            }
+        }
+        
+        // Log on to MailUp button handler
+        function logOn() {
+            mailUp.logOn();
+        }
+        
+        // Call Method button handler
+        function callMethod() {
+            mailUp.callMethod(document.getElementById("lstEndpoint").value + document.getElementById("txtPath").value,
+                              document.getElementById("lstVerb").value,
+                              document.getElementById("txtBody").value,
+                              document.getElementById("lstContentType").value,
+                              function(data) {
+                                    document.getElementById("pResultString").innerHTML = data;
+                              },
+                              function(error) {
+                                    document.getElementById("pResultString").innerHTML = error;
+                              });
+        }
+        
+        // Examples
+        var groupId = -1;
+        var emailId = -1;
+        
+        // EXAMPLE 1 - IMPORT RECIPIENTS INTO NEW GROUP
+        // List ID = 1 is used in all example calls
+        function runExample1() {
+            var exampleResult = "";
+            
+            // Helper function
+            function runExample1Helper() {
+                // Request for dynamic fields to map recipient name and surname
+                var url2 = mailUp.getConsoleEndpoint() + "/Console/Recipient/DynamicFields";
+                mailUp.callMethod(url2, "GET", null, "JSON", function(data) {
+                    exampleResult += "Request for dynamic fields to map recipient name and surname<br/>GET "+url2+" - OK<br/>";
+                    
+                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                    
+                    // Import recipients to group
+                    var url3 = mailUp.getConsoleEndpoint() + "/Console/Group/" + groupId + "/Recipients";
+                    var recipientRequest = "[{\"Email\":\"test@test.test\",\"Fields\":[{\"Description\":\"String description\",\"Id\":1,\"Value\":\"String value\"}],\"MobileNumber\":\"\",\"MobilePrefix\":\"\",\"Name\":\"John Smith\"}]";
+                    mailUp.callMethod(url3, "POST", recipientRequest, "JSON", function(data) {
+                        var importId = data;
+           
+                        exampleResult += "Import recipients to group<br/>POST "+url3+" - OK<br/>";   
+                        
+                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                        
+                        // Check the import result
+                        var url4 = mailUp.getConsoleEndpoint() + "/Console/Import/" + importId;
+                        mailUp.callMethod(url4, "GET", null, "JSON", function(data) {
+                            exampleResult += "Check the import result<br/>GET "+url4+" - OK<br/>"; 
+            
+                            exampleResult += "Example methods completed successfully<br/>";
+                            
+                            document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                        }, function(error) {
+                            document.getElementById("pExampleResultString").innerHTML = error;
+                        });
+                    }, function(error) {
+                        document.getElementById("pExampleResultString").innerHTML = error;
+                    });
+                }, function(error) {
+                    document.getElementById("pExampleResultString").innerHTML = error;
+                });
+            }
+            
+            // Given a default list id (use idList = 1), request for user visible groups
+            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Groups";
+            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+                var obj = JSON.parse(data);
+                var arr = obj.Items;
+                for (i = 0; i < arr.length; i++) {
+                    var group = arr[i];
+                    if ("test import" == group.Name) groupId = group.idGroup;
+                }
+                                           
+                exampleResult += "Given a default list id (use idList = 1), request for user visible groups<br/>GET "+url+" - OK<br/>";
+                                           
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                // If the list does not contain a group named "test import", create it
+                if (groupId == -1) {
+                    groupId = 100;
+                    var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Group";
+                    var groupRequest = "{\"Deletable\":true,\"Name\":\"test import\",\"Notes\":\"test import\"}";
+                    mailUp.callMethod(url1, "POST", groupRequest, "JSON", function(data) {
+                        var obj = JSON.parse(data);
+                        var arr = obj.Items;
+                        for (i = 0; i < arr.length; i++) {
+                            var group = arr[i];
+                            if ("test import" == group.Name) groupId = group.idGroup;
+                        }
+                                           
+                        exampleResult += "If the list does not contain a group named \"test import\", create it<br/>POST "+url1+" - OK<br/>";
+                                           
+                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                        runExample1Helper();
+                    }, function(error) {
+                        document.getElementById("pExampleResultString").innerHTML = error;
+                    });
+                } else runExample1Helper();
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });
+        }
+        
+        // EXAMPLE 2 - UNSUBSCRIBE A RECIPIENT FROM A GROUP
+        function runExample2() {
+            var exampleResult = "";
+            
+            // Request for recipient in a group
+            var url = mailUp.getConsoleEndpoint() + "/Console/Group/" + groupId + "/Recipients";
+            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+                var obj = JSON.parse(data);
+                var arr = obj.Items;
+                
+                var recipientId = -1;
+                if (arr.length > 0) {
+                    recipientId = arr[0].idRecipient;
+                }
+                                           
+                exampleResult += "Request for recipient in a group<br/>GET "+url+" - OK<br/>";
+                                           
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                // Pick up a recipient and unsubscribe it
+                if (recipientId != -1) {
+                    var url1 = mailUp.getConsoleEndpoint() + "/Console/Group/" + groupId + "/Unsubscribe/" + recipientId;
+                    mailUp.callMethod(url1, "DELETE", null, "JSON", function(data) {
+                     
+                        exampleResult += "Pick up a recipient and unsubscribe it<br/>DELETE "+url1+" - OK<br/>";
+                                           
+                        exampleResult += "Example methods completed successfully<br/>";
+                            
+                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                         
+                    }, function(error) {
+                        document.getElementById("pExampleResultString").innerHTML = error;
+                    });
+                } else {
+                    exampleResult += "No recipients found<br/>";
+                                           
+                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                }
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });
+        }
+        
+        // EXAMPLE 3 - UPDATE A RECIPIENT DETAIL
+        function runExample3() {
+            var exampleResult = "";
+            
+            // Request for existing subscribed recipients
+            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Recipients/Subscribed";
+            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+                var obj = JSON.parse(data);
+                var arr = obj.Items;
+                
+                exampleResult += "Request for existing subscribed recipients<br/>GET "+url+" - OK<br/>";
+                                           
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                if (arr.length > 0) {
+                    var recipient = arr[0];
+                    
+                    if (recipient.Fields.length == 0) {
+                        var field = '{"Id":1,"Value":"Updated value","Description":""}';
+                        recipient.Fields.push(JSON.parse(field));
+                    } else {
+                        recipient.Fields[0].Id = 1;
+                        recipient.Fields[0].Value = "Updated value";
+                        recipient.Fields[0].Description = "";
+                    }
+                    
+                    // Update the modified recipient
+                    var url1 = mailUp.getConsoleEndpoint() + "/Console/Recipient/Detail";
+                    mailUp.callMethod(url1, "PUT", JSON.stringify(recipient), "JSON", function(data) {
+                     
+                        exampleResult += "Update the modified recipient<br/>PUT "+url1+" - OK<br/>";
+                                           
+                        exampleResult += "Example methods completed successfully<br/>";
+                            
+                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                         
+                    }, function(error) {
+                        document.getElementById("pExampleResultString").innerHTML = error;
+                    });
+                }
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });
+        }
+        
+        // EXAMPLE 4 - CREATE A MESSAGE FROM TEMPLATE
+        function runExample4() {
+            var exampleResult = "";
+            
+            // Get the available template list
+            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Templates";
+            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+                var arr = JSON.parse(data);
+                
+                var templateId = -1;
+                if (arr.length > 0) {
+                    templateId = arr[0].Id;
+                }
+                                           
+                exampleResult += "Get the available template list<br/>GET "+url+" - OK<br/>";
+                                           
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                // Create the new message
+                var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/Template/" + templateId;
+                mailUp.callMethod(url1, "POST", null, "JSON", function(data) {
+                    var obj = JSON.parse(data);
+                    var arr = obj.Items;
+                    
+                    if (arr.length > 0) {
+                        emailId = arr[0].idMessage;
+                    }
+                     
+                    exampleResult += "Create the new message<br/>POST "+url1+" - OK<br/>";
+                                           
+                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                    
+                    // Request for messages list
+                    var url2 = mailUp.getConsoleEndpoint() + "/Console/List/1/Emails";
+                    mailUp.callMethod(url2, "GET", null, "JSON", function(data) {
+                        
+                        exampleResult += "Request for messages list<br/>GET "+url2+" - OK<br/>";
+                                           
+                        exampleResult += "Example methods completed successfully<br/>";
+                            
+                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                         
+                    }, function(error) {
+                        document.getElementById("pExampleResultString").innerHTML = error;
+                    });                         
+                }, function(error) {
+                    document.getElementById("pExampleResultString").innerHTML = error;
+                });
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });
+        }
+        
+        // EXAMPLE 5 - CREATE A MESSAGE WITH IMAGES AND ATTACHMENTS
+        function runExample5() {
+            var exampleResult = "";
+            
+            // Image bytes can be obtained from file, database or any other source
+            var base64Image = "iVBORw0KGgoAAAANSUhEUgAAAR4AAACnCAMAAADwpcPtAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAYBQTFRFKSkphYWFeHh4GhoaYWFhJSUlVVVV3t7ePT09XV1doKCgdXV1np6ezMzMrq6upqamxMTEWVlZz8/Po6OjoqKilpaWZ2dnNjY2SEhIbm5usLCwysrKtra2AAAAZWVlvLy8h4eHx8fHqampmpqawsLC1NTUxsbGmJiYlJSUs7OzfHx8nJycRERERkZGiYmJwMDAq6urS0tL0dHRISEhrKysjIyMcnJyj4+PuLi4NDQ0KioqZGRkkJCQTExMODg4urq6kpKSUFBQQEBAU1NTMTExioqKcHBwLCwsCgoKQkJCTk5OOjo6Ly8vgICAgoKCFhYW0tLSLi4ufn5+ERERa2trbGxs2tra7+/v5ubm+vr68fHx+fn5tbW1/Pz8/f394uLi7u7u9PT08PDw+/v75OTk/v7+8/Pz4+Pj8vLy9vb29/f32NjY6+vr3d3d19fX6Ojo5eXl3Nzc7e3t5+fn+Pj49fX14ODgvr6+v7+/7Ozs6enp2dnZ4eHh6urqtLS0////r2s4NAAAAIB0Uk5T/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wA4BUtnAAAU8klEQVR42uyd+UPaSBvHoxJEFBAtBKyzHuh6YVvWlQoKLZAWLB7r0kWBggoigvd9O//6mwtIQiCJpTV9m/mhRchMnnwy88yTme9MEKimBglREah4VDwqHhWPiuf/DM9lz1Rnh5ZM5s/j3WeSSs3E9W5tKBTSmju7ei7rHZVPSU0XCWXiSf9pnwHstOrr2xMrc9fkIQ+NxGIR8v+ZzrjwcRvIjKSEIohbiXjSExh5eZoF45+nD1eGCYs1TPzd9qZhFUr3tgHgnx0p3CazB4dPb4IEoz+uhI48aZOWUABsL4cnV6/mGnQEi1YDu3EkDi048aU+XbfAYyeItJ5yKokDAcuCTXBbSrq8eA/A3y+G57UnPCH0S2mZ4DC+VfN9boCg5izU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";
+
+            // Upload an image
+            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Images";
+            var imageRequest = "{\"Base64Data\":\""+base64Image+"\",\"Name\":\"Avatar\"}";
+            mailUp.callMethod(url, "POST", imageRequest, "JSON", function(data) {
+                
+                exampleResult += "Upload an image<br/>POST "+url+" - OK<br/>";
+                                           
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                // Get the images available
+                var url1 = mailUp.getConsoleEndpoint() + "/Console/Images";
+                mailUp.callMethod(url1, "GET", null, "JSON", function(data) {
+                    var arr = JSON.parse(data);
+                    
+                    var imgSrc = ""
+                    if (arr.length > 0) {
+                        imgSrc = arr[0];
+                    }
+                     
+                    exampleResult += "Get the images available<br/>GET "+url1+" - OK<br/>";
+                                           
+                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                    
+                    // Create and save "hello" message
+                    imgSrc = imgSrc.split("\\").join("\\\\");
+                    imgSrc = imgSrc.split("/").join("\\/");
+                    var message = "<html><body><p>Hello<\\/p><img src=\\\""+imgSrc+"\\\" \\/><\\/body><\\/html>";
+                    
+                    var email = '{"Subject":"Test Message Objective-C","idList":1,"Content":"'+message+
+                            '","Embed":true,"IsConfirmation":true,"Fields":[],"Notes":"Some notes","Tags":[],"TrackingInfo":{"CustomParams":"","Enabled":true,"Protocols":["http"]}}';
+                    
+                    var url2 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email";
+                    mailUp.callMethod(url2, "POST", email, "JSON", function(data) {
+                        var obj = JSON.parse(data);
+                        var arr = obj.Items;
+                    
+                        if (arr.length > 0) {
+                            emailId = arr[0].idMessage;
+                        }
+                        
+                        exampleResult += "Create and save \"hello\" message<br/>POST "+url2+" - OK<br/>";
+                                           
+                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                        
+                        // Add an attachment
+                        var attachment = "QmFzZSA2NCBTdHJlYW0="; // Base64 String
+                        var attachmentRequest = "{\"Base64Data\":\""+attachment+"\",\"Name\":\"TestFile.txt\",\"Slot\":1,\"idList\":1,\"idMessage\":"+emailId+"}";
+                        var url3 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId + "/Attachment/1";
+                        mailUp.callMethod(url3, "POST", attachmentRequest, "JSON", function(data) {                                
+                     
+                            exampleResult += "Add an attachment<br/>POST "+url3+" - OK<br/>";
+                                           
+                            document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                    
+                            // Retreive message details
+                            var url4 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId;
+                            mailUp.callMethod(url4, "GET", null, "JSON", function(data) {
+                        
+                                exampleResult += "Retreive message details<br/>GET "+url4+" - OK<br/>";
+                                           
+                                exampleResult += "Example methods completed successfully<br/>";
+                            
+                                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                         
+                            }, function(error) {
+                                document.getElementById("pExampleResultString").innerHTML = error;
+                            });                         
+                        }, function(error) {
+                            document.getElementById("pExampleResultString").innerHTML = error;
+                        });                         
+                    }, function(error) {
+                        document.getElementById("pExampleResultString").innerHTML = error;
+                    });                         
+                }, function(error) {
+                    document.getElementById("pExampleResultString").innerHTML = error;
+                });
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });
+        }
+        
+        // EXAMPLE 6 - TAG A MESSAGE
+        function runExample6() {
+            var exampleResult = "";
+            
+            // Create a new tag
+            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Tag";
+            mailUp.callMethod(url, "POST", "\"test tag\"", "JSON", function(data) {
+                var arr = JSON.parse(data);
+                
+                var tagId = -1;
+                if (arr.length > 0) {
+                    tagId = arr[0].Id;
+                }
+                                           
+                exampleResult += "Create a new tag<br/>POST "+url+" - OK<br/>";
+                                           
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                // Pick up a message and retrieve detailed informations
+                var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId;
+                mailUp.callMethod(url1, "GET", null, "JSON", function(data) {
+                    var obj = JSON.parse(data);
+                    
+                    exampleResult += "Pick up a message and retrieve detailed informations<br/>GET "+url1+" - OK<br/>";
+                                           
+                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                    
+                    // Add the tag to the message details and save
+                    var tags = '[{"Id":'+tagId+',"Enabled":true,"Name":"test tag"}]';
+                    obj.Tags = JSON.parse(tags);
+                    
+                    var url2 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId;
+                    mailUp.callMethod(url2, "PUT", JSON.stringify(obj), "JSON", function(data) {
+                        
+                        exampleResult += "Add the tag to the message details and save<br/>PUT "+url2+" - OK<br/>";
+                                           
+                        exampleResult += "Example methods completed successfully<br/>";
+                            
+                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                         
+                    }, function(error) {
+                        document.getElementById("pExampleResultString").innerHTML = error;
+                    });                         
+                }, function(error) {
+                    document.getElementById("pExampleResultString").innerHTML = error;
+                });
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });            
+        }
+        
+        // EXAMPLE 7 - SEND A MESSAGE
+        function runExample7() {
+            var exampleResult = "";
+            
+            // Get the list of the existing messages
+            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Emails";
+            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+                var obj = JSON.parse(data);
+                var arr = obj.Items;
+                
+                if (arr.length > 0) {
+                    emailId = arr[0].idMessage;
+                }
+                                           
+                exampleResult += "Get the list of the existing messages<br/>GET "+url+" - OK<br/>";
+                                           
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                                           
+                // Send email to all recipients in the list
+                var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId + "/Send";
+                mailUp.callMethod(url1, "POST", null, "JSON", function(data) {
+                     
+                    exampleResult += "Send email to all recipients in the list<br/>POST "+url1+" - OK<br/>";
+                                           
+                    exampleResult += "Example methods completed successfully<br/>";
+                        
+                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                         
+                }, function(error) {
+                    document.getElementById("pExampleResultString").innerHTML = error;
+                });
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });
+        }
+        
+        // EXAMPLE 8 - DISPLAY STATISTICS FOR A MESSAGE SENT AT EXAMPLE 7
+        function runExample8() {
+            var exampleResult = "";
+            
+            // Request (to MailStatisticsService.svc) for paged message views list for the previously sent message
+            var hours = 4;
+            var url = mailUp.getMailstatisticsEndpoint() + "/Message/" + emailId + "/Views/List/Last/" + hours + "?pageSize=5&pageNum=0";
+            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+                
+                exampleResult += "Request (to MailStatisticsService.svc) for paged message views list for the previously sent message<br/>GET "+url+" - OK<br/>";
+                                           
+                exampleResult += "Example methods completed successfully<br/>";
+                        
+                document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                
+            }, function(error) {
+                document.getElementById("pExampleResultString").innerHTML = error;
+            });
+            
+        }
+        
+    </script>
+<p>
+<input type="button" OnClick="logOn();" id="LogOn" value="Sign in to MailUp"/>
+</p>
+
+<p id="pAuthorization">Unauthorized</p><br /><br />
+
+<p><b>Custom method call</b></p>
+<table>
+<thead>
+<td>Verb</td>
+<td>Content-Type</td>
+<td>Endpoint</td>
+<td>Path</td>
+</thead>
+<tr>
+    <td><select id="lstVerb">
+        <option selected value="GET">GET</option>
+        <option value="POST">POST</option>
+        <option value="PUT">PUT</option>
+        <option value="DELETE">DELETE</option>
+    </select></td>
+    <td><select id="lstContentType">
+        <option selected value="JSON">JSON</option>
+        <option value="XML">XML</option>
+    </select></td>
+    <td><select id="lstEndpoint">
+        <option selected value="http://preft01.ss.mailup.it:9900/Rest/ConsoleService.svc">Console</option>
+        <option value="http://preft01.ss.mailup.it:9900/Rest/MailStatisticsService.svc">MailStatistics</option>
+    </select></td>
+<td><input type="text" id="txtPath" value="/Console/Authentication/Info" style="width:200px;"/></td>
+</tr>
+</table>
+
+<p>Body</p><p><textarea id="txtBody" rows="5" cols="60"></textarea></p>
+<p>
+<input type="button" OnClick="callMethod();" id="CallMethod" value="Call Method"/>
+</p>
+
+<p id="pResultString"></p><br /><br />
+
+<p><b>Run example set of calls</b></p>
+
+<p id="pExampleResultString"></p>
+<p>
+<input type="button" onclick="runExample1();" id="RunExample1" value="Run example code 1 - Import recipients"/>
+</p>
+<p>
+<input type="button" onclick="runExample2();" id="RunExample2" value="Run example code 2 - Unsubscripe a recipient"/>
+</p>
+<p>
+<input type="button" onclick="runExample3();" id="RunExample3" value="Run example code 3 - Update a recipient"/>
+</p>
+<p>
+<input type="button" onclick="runExample4();" id="RunExample4" value="Run example code 4 - Create a message from template"/>
+</p>
+<p>
+<input type="button" onclick="runExample5();" id="RunExample5" value="Run example code 5 - Create a message from scratch"/>
+</p>
+<p>
+<input type="button" onclick="runExample6();" id="RunExample6" value="Run example code 6 - Tag a message"/>
+</p>
+<p>
+<input type="button" onclick="runExample7();" id="RunExample7" value="Run example code 7 - Send a message"/>
+</p>
+<p>
+<input type="button" onclick="runExample8();" id="RunExample8" value="Run example code 8 - Retreive statistics"/>
+</p>
+</body>
+</html>
