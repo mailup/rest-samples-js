@@ -30,7 +30,9 @@ This project encloses a short list of pre definied samples describing some of th
 
 Debugging tool 
 ------------------------
-* firebug ( http://getfirebug.com/ )
+* firebug ( [Download] [4] )
+
+[4]: http://getfirebug.com/        "Download"
 
 Notes
 ------------------------
