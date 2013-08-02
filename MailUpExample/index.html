@@ -12,7 +12,7 @@ var CALLBACK_URI = "http://127.0.0.1/index.html";
         
 </script>
 </head>
-<body>
+<body onload="Init()">
 <h2>
 MailUp Demo Client
 </h2>
@@ -36,6 +36,13 @@ MailUp Demo Client
                 });
             }
         }
+        
+        function Init(){
+        	var opt = document.getElementById("lstEndpoint").options;
+		
+		opt[1].value = mailUp.getMailstatisticsEndpoint();
+		opt[0].value = mailUp.getConsoleEndpoint();
+		}
         
         // Log on to MailUp button handler
         function logOn() {
@@ -508,8 +515,8 @@ MailUp Demo Client
         <option value="XML">XML</option>
     </select></td>
     <td><select id="lstEndpoint">
-        <option selected value="http://preft01.ss.mailup.it:9900/Rest/ConsoleService.svc">Console</option>
-        <option value="http://preft01.ss.mailup.it:9900/Rest/MailStatisticsService.svc">MailStatistics</option>
+        <option selected >Console</option>
+        <option >MailStatistics</option>
     </select></td>
 <td><input type="text" id="txtPath" value="/Console/Authentication/Info" style="width:200px;"/></td>
 </tr>
