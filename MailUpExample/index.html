@@ -48,6 +48,18 @@ MailUp Demo Client
         function logOn() {
             mailUp.logOn();
         }
+		
+		// Log on to MailUp with username and password button handler
+        function logOnWithUsernamePassword() {
+            
+			mailUp.logOnWithUsernamePassword(document.getElementById("txtUsr").value,document.getElementById("txtPwd").value,
+							function(data) {
+                                    document.getElementById("pAuthorization").innerHTML = "Authorized. Token: "+data;
+                            },
+                            function(error) {
+                                    document.getElementById("pAuthorization").innerHTML = "Unauthorized";
+                            });
+        }
         
         // Call Method button handler
         function callMethod() {
@@ -491,6 +503,11 @@ MailUp Demo Client
     </script>
 <p>
 <input type="button" OnClick="logOn();" id="LogOn" value="Sign in to MailUp"/>
+</p>
+<p>
+Username: <input type="text" id="txtUsr" value="type your MailUp username" style="width:400px;"/><br/>
+Password: <input type="text" id="txtPwd" value="type your MailUp password" style="width:400px;"/><br/>
+<input type="button" OnClick="logOnWithUsernamePassword();" value="Sign in to MailUp using Password flow"/>
 </p>
 
 <p id="pAuthorization">Unauthorized</p><br /><br />
