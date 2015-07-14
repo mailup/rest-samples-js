@@ -257,13 +257,14 @@ MailUp Demo Client
             
             // Get the available template list
             var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Templates";
-            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+            mailUp.callMethod(url, "GET", null, "JSON", function (data) {
+
                 var arr = JSON.parse(data);
-                
+
                 var templateId = -1;
-                if (arr.length > 0) {
-                    templateId = arr[0].Id;
-                }
+                if (arr.Items.length > 0) {
+                    templateId = arr.Items[1].Id;
+                }   
                                            
                 exampleResult += "Get the available template list<br/>GET "+url+" - OK<br/>";
                                            
@@ -271,12 +272,12 @@ MailUp Demo Client
                                            
                 // Create the new message
                 var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/Template/" + templateId;
-                mailUp.callMethod(url1, "POST", null, "JSON", function(data) {
-                    var obj = JSON.parse(data);
-                    var arr = obj.Items;
-                    
+                mailUp.callMethod(url1, "POST", null, "JSON", function (data) {
+
+                    var arr = JSON.parse(data);
+                                       
                     if (arr.length > 0) {
-                        emailId = arr[0].idMessage;
+                        emailId = arr.idMessage;
                     }
                      
                     exampleResult += "Create the new message<br/>POST "+url1+" - OK<br/>";
@@ -343,12 +344,14 @@ MailUp Demo Client
                             '","Embed":true,"IsConfirmation":true,"Fields":[],"Notes":"Some notes","Tags":[],"TrackingInfo":{"CustomParams":"","Enabled":true,"Protocols":["http"]}}';
                     
                     var url2 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email";
-                    mailUp.callMethod(url2, "POST", email, "JSON", function(data) {
-                        var obj = JSON.parse(data);
-                        var arr = obj.Items;
-                    
-                        if (arr.length > 0) {
-                            emailId = arr[0].idMessage;
+                    mailUp.callMethod(url2, "POST", email, "JSON", function (data) {
+
+                        var arr = JSON.parse(data);
+                        
+                        console.log(data.length);
+                        
+                        if (data.length > 0) {
+                            emailId = arr.idMessage;
                         }
                         
                         exampleResult += "Create and save \"hello\" message<br/>POST "+url2+" - OK<br/>";
@@ -485,7 +488,7 @@ MailUp Demo Client
             
             // Request (to MailStatisticsService.svc) for paged message views list for the previously sent message
             var hours = 4;
-            var url = mailUp.getMailstatisticsEndpoint() + "/Message/" + emailId + "/Views/List/Last/" + hours + "?pageSize=5&pageNum=0";
+            var url = mailUp.getMailstatisticsEndpoint() + "/Message/" + emailId + "/List/Views?pageSize=5&pageNum=0";
             mailUp.callMethod(url, "GET", null, "JSON", function(data) {
                 
                 exampleResult += "Request (to MailStatisticsService.svc) for paged message views list for the previously sent message<br/>GET "+url+" - OK<br/>";
