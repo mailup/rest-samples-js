@@ -3,26 +3,59 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>MailUp Demo Client</title>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<link rel="stylesheet" href="resources/css/styles.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery-validation@1.17.0/dist/jquery.validate.js"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 <script src="./mailupclient.js"></script>
+<script src="./config.js"></script>
 <script>
-        
-var CLIENT_ID = "6a324fe1-5bfa-4b5f-815b-f05d2d7efcd8";
-var CLIENT_SECRET = "f05b406e-deb8-408d-8cfd-8f2a92111dde";
-var CALLBACK_URI = "http://127.0.0.1/index.html";
-        
+var CLIENT_ID = ConfigStrings.CLIENT_ID;
+var CLIENT_SECRET = ConfigStrings.CLIENT_SECRET;
+var CALLBACK_URI = ConfigStrings.CALLBACK_URI;
+var LIST_ID = ConfigStrings.LIST_ID;
+
+$(function () {
+	$('.spoiler-body').hide(300);
+	$(document).on('click','.spoiler-head',function (e) {
+		e.preventDefault()
+		$(this).parents('.spoiler-wrap').toggleClass("active").find('.spoiler-body').slideToggle();
+    })
+})
+
 </script>
 </head>
 <body onload="Init()">
-<h2>
-MailUp Demo Client
-</h2>
+<div class = "container">
+    <div class="bd-pageheader text-center text-sm-left">
+        <h1><strong>MailUp Demo Client</strong></h1>
+    </div>
     <script>
-        
-        
-        
+        var answer = " <div class=\"spoiler-wrap disabled\">"
+        + " <div class=\"spoiler-head\">{0}</div>"
+        + "   <div class=\"spoiler-body\">\n"
+        + "     <div class=\"form-group row\">"
+        + "         <div class=\"col-xs-2\"><label>Verb</label><span class=\"form-control example-body\">{1}</span></div>\n"
+        + "         <div class=\"col-xs-2\"><label>Content-Type</label><span class=\"form-control example-body\">{2}</span></div>\n"
+        + "         <div class=\"col-xs-2\"><label>Endpoint</label><span class=\"form-control example-body\">{3}</span></div>\n"
+        + "         <div class=\"col-xs-6\"><label>Path</label><span class=\"form-control example-body\">{4}</span></div>\n"
+        + "     </div>\n"
+        + "     <div class=\"form-group\"><label>Body</label>"
+        + "         <div class=\"form-control example-body\">{5}</div>"
+        + "     </div>"
+        + "     <div class=\"well\">"
+        + "         <div class=\"form-group example-body\"><label>Response</label><div>{6}</div></div>"
+        + "     </div>"
+        + "  </div>"
+        + "</div>";
+
+        var successfullyAnswer = "<div class=\"successfullyAnswer\"><strong>{0}</strong></div>";
+        var errorAnswer = "<div class=\"errorAnswer\"><strong>{0}</strong></div>";
         // Initialize MailUp
         var mailUp = new MailUpClient(CLIENT_ID, CLIENT_SECRET, CALLBACK_URI);
-        
+        var refreshInterval = 0;
+
         // Obtain access token
         var params = window.location.search.slice(1).split("&");
         for (var i = 0; i < params.length; i++) {
@@ -30,199 +63,324 @@ MailUp Demo Client
             if (param[0]=="code") { // We have code returned from MailUp
                 var code = param[1];
                 mailUp.retreiveAccessTokenWithCode(code, function(token) {
-                    document.getElementById("pAuthorization").innerHTML = "Authorized. Token: "+token;
+                    authorized(token);
+                    isToken(token);
+                    expireTimer();
                 }, function(error) {
-                    document.getElementById("pAuthorization").innerHTML = "Unauthorized";
+                    unauthorized();
                 });
             }
         }
-        
+
         function Init(){
-        	var opt = document.getElementById("lstEndpoint").options;
-		
-		opt[1].value = mailUp.getMailstatisticsEndpoint();
-		opt[0].value = mailUp.getConsoleEndpoint();
-		}
-        
+            var opt = document.getElementById("lstEndpoint").options;
+            var getToken = mailUp.getAccessToken1();		
+		    opt[1].value = mailUp.getMailstatisticsEndpoint();
+            opt[0].value = mailUp.getConsoleEndpoint();
+            if (getToken == "") {
+                unauthorized();
+            } else {
+                authorized(getToken);
+            }
+            isToken(getToken);
+            expireTimer();
+        }
+
         // Log on to MailUp button handler
         function logOn() {
             mailUp.logOn();
         }
-		
+
 		// Log on to MailUp with username and password button handler
         function logOnWithUsernamePassword() {
-            
+
 			mailUp.logOnWithUsernamePassword(document.getElementById("txtUsr").value,document.getElementById("txtPwd").value,
-							function(data) {
-                                    document.getElementById("pAuthorization").innerHTML = "Authorized. Token: "+data;
-                            },
-                            function(error) {
-                                    document.getElementById("pAuthorization").innerHTML = "Unauthorized";
-                            });
+				function(data) {
+                    authorized(data);
+                    isToken(data);
+                    expireTimer();
+                },
+                function(error) {
+                    unauthorized();
+            });
         }
-        
+
         // Call Method button handler
         function callMethod() {
             mailUp.callMethod(document.getElementById("lstEndpoint").value + document.getElementById("txtPath").value,
-                              document.getElementById("lstVerb").value,
-                              document.getElementById("txtBody").value,
-                              document.getElementById("lstContentType").value,
-                              function(data) {
-                                    document.getElementById("pResultString").innerHTML = data;
-                              },
-                              function(error) {
-                                    document.getElementById("pResultString").innerHTML = error;
-                              });
+                document.getElementById("lstVerb").value,
+                document.getElementById("txtBody").value,
+                document.getElementById("lstContentType").value,
+                function(body, data) {
+                    document.getElementById("pResultString").innerHTML = data;
+                },
+                function(error) {
+                    document.getElementById("pResultString").innerHTML = error;
+            });
         }
-        
+
+        function getRefreshToken() {
+            mailUp.refreshAccessToken(
+                function(data) {
+                    authorized(data);
+                    expireTimer();
+                },
+                function(error) {
+                    unauthorized();
+                }
+            );
+        }
+
+        function showImage(imgId, isShow) {
+            document.getElementById(imgId).hidden = isShow;
+        }
+
+        function isToken(getToken) {
+            document.getElementById("showExpiresInTimer").hidden = (getToken == "") ? true : false;
+            document.getElementById("refreshToken").disabled = (getToken == "") ? "disabled" : false;
+        }
+
+        function unauthorized() {
+            document.getElementById("pAuthorization").innerHTML = "<div><strong>Unauthorized</strong></div>";
+        }
+
+        function authorized(data) {
+            document.getElementById("pAuthorization").innerHTML = "<div><strong>Authorized.</strong></div><div><strong>Token: </strong></div>"+data;
+        }
+
+        function check() {
+            var pole1 = document.getElementById("txtUsr"),
+            pole2 = document.getElementById("txtPwd");
+            document.getElementById("LogOnWithUsernamePassword").disabled = pole1.value && pole2.value ? false : "disabled";
+        }
+
+        function startTimer(duration, display) {
+            var timer = duration, days, showHours, hours, minutes, seconds;
+
+            refreshInterval = setInterval(function () {
+                days = Math.floor(timer / (60 * 60 * 24));
+                hours = Math.floor((timer % (60 * 60 * 24)) / (60 * 60));
+                minutes = Math.floor((timer % (60 * 60)) / 60);
+                seconds = Math.floor(timer % (60));
+
+                if (days > 0) {
+                    days = (days < 10 ? "0" + days : days) + "d ";
+                    showHours = true;
+                } else {
+                    days = '';
+                    showHours = false;
+                }
+
+                if (hours > 0 || showHours) {
+                    hours = (hours < 10 ? "0" + hours : hours) + "h ";
+                } else {
+                    hours = '';
+                }
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = days + hours + minutes + "m " + seconds + "s";
+
+                if (--timer < 0) {
+                    timer = duration;
+                    clearInterval(refreshInterval);
+                    unauthorized();
+                    isToken("");
+                    refreshInterval = 0;
+                    mailUp.setAccessToken1("");
+                }
+            }, 1000);
+        }
+
+        function expireTimer() {
+            var timer;
+            var accessTokenExpire = getCookie("access_token_expire");
+            if (accessTokenExpire) {
+                timer = (accessTokenExpire - (new Date()).getTime()) / 1000;
+                if (refreshInterval != 0) {
+                    clearInterval(refreshInterval); 
+                }
+                startTimer(timer, document.querySelector('#expiresInTimer'));
+            } else {
+                document.querySelector('#expiresInTimer').textContent = "";
+            }
+        }
+
+        function getCookie(name) {
+            var matches = document.cookie.match(new RegExp(
+                "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+                ));
+            return matches ? decodeURIComponent(matches[1]) : undefined;
+        }
+
         // Examples
         var groupId = -1;
         var emailId = -1;
-        
+
         // EXAMPLE 1 - IMPORT RECIPIENTS INTO NEW GROUP
-        // List ID = 1 is used in all example calls
+        // List ID from config.js is used in all example calls
         function runExample1() {
-            var exampleResult = "";
-            
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img1";
+            showImage(imgId, false);
+            $(".example1").children().not(".btn-success, .img").remove();
             // Helper function
             function runExample1Helper() {
                 // Request for dynamic fields to map recipient name and surname
-                var url2 = mailUp.getConsoleEndpoint() + "/Console/Recipient/DynamicFields";
-                mailUp.callMethod(url2, "GET", null, "JSON", function(data) {
-                    exampleResult += "Request for dynamic fields to map recipient name and surname<br/>GET "+url2+" - OK<br/>";
-                    
-                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                    
-                    // Import recipients to group
-                    var url3 = mailUp.getConsoleEndpoint() + "/Console/Group/" + groupId + "/Recipients";
+                var url2 = "/Console/Recipient/DynamicFields";
+                messageResult = "Request for dynamic fields to map recipient name and surname";
+                mailUp.callMethod(mailUp.getConsoleEndpoint() + url2, "GET", null, "JSON", function(body, data) {
+
+                    $(".example1").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url2, body? body : "", data));
+
+                    var url3 = "/Console/Group/" + groupId + "/Recipients";
                     var recipientRequest = "[{\"Email\":\"test@test.test\",\"Fields\":[{\"Description\":\"String description\",\"Id\":1,\"Value\":\"String value\"}],\"MobileNumber\":\"\",\"MobilePrefix\":\"\",\"Name\":\"John Smith\"}]";
-                    mailUp.callMethod(url3, "POST", recipientRequest, "JSON", function(data) {
+                    messageResult = "Import recipients to group";
+                    mailUp.callMethod(mailUp.getConsoleEndpoint() + url3, "POST", recipientRequest, "JSON", function(body, data) {
                         var importId = data;
-           
-                        exampleResult += "Import recipients to group<br/>POST "+url3+" - OK<br/>";   
-                        
-                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                        
+
+                        $(".example1").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url3, body? body : "", data));
+
                         // Check the import result
-                        var url4 = mailUp.getConsoleEndpoint() + "/Console/Import/" + importId;
-                        mailUp.callMethod(url4, "GET", null, "JSON", function(data) {
-                            exampleResult += "Check the import result<br/>GET "+url4+" - OK<br/>"; 
-            
-                            exampleResult += "Example methods completed successfully<br/>";
+                        var url4 = "/Console/Import/" + importId;
+                        messageResult = "Check the import result";
+                        mailUp.callMethod(mailUp.getConsoleEndpoint() + url4, "GET", null, "JSON", function(body, data) {
                             
-                            document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                            errorResult = "Example methods completed successfully";
+                            $(".example1").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url4, body? body : "", data));
+                            $(".example1").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                            showImage(imgId, true);
                         }, function(error) {
-                            document.getElementById("pExampleResultString").innerHTML = error;
+                            $(".example1").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url4, "", ""));
+                            $(".example1").append(jQuery.validator.format(errorAnswer, error));
+                            showImage(imgId, true);
                         });
                     }, function(error) {
-                        document.getElementById("pExampleResultString").innerHTML = error;
+                        $(".example1").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url3, "", ""));
+                        $(".example1").append(jQuery.validator.format(errorAnswer, error));
+                        showImage(imgId, true);
                     });
                 }, function(error) {
-                    document.getElementById("pExampleResultString").innerHTML = error;
+                    $(".example1").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url2, "", ""));
+                    $(".example1").append(jQuery.validator.format(errorAnswer, error));
+                    showImage(imgId, true);
                 });
             }
-            
-            // Given a default list id (use idList = 1), request for user visible groups
-            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Groups";
-            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+
+            // Given a default list id (use idList from config.js), request for user visible groups
+            var url = "/Console/List/"+ LIST_ID +"/Groups";
+            messageResult = "Given a default list id (use idList = " + LIST_ID + "), request for user visible groups";
+            mailUp.callMethod(mailUp.getConsoleEndpoint() + url, "GET", null, "JSON", function(body, data) {
                 var obj = JSON.parse(data);
                 var arr = obj.Items;
                 for (i = 0; i < arr.length; i++) {
                     var group = arr[i];
                     if ("test import" == group.Name) groupId = group.idGroup;
                 }
-                                           
-                exampleResult += "Given a default list id (use idList = 1), request for user visible groups<br/>GET "+url+" - OK<br/>";
-                                           
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+
+                $(".example1").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, body? body : "", data));
+
                 // If the list does not contain a group named "test import", create it
                 if (groupId == -1) {
                     groupId = 100;
-                    var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Group";
+                    var url1 = "/Console/List/"+LIST_ID+"/Group";
                     var groupRequest = "{\"Deletable\":true,\"Name\":\"test import\",\"Notes\":\"test import\"}";
-                    mailUp.callMethod(url1, "POST", groupRequest, "JSON", function(data) {
+                    mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "POST", groupRequest, "JSON", function(body, data) {
                         var obj = JSON.parse(data);
                         var arr = obj.Items;
                         for (i = 0; i < arr.length; i++) {
                             var group = arr[i];
                             if ("test import" == group.Name) groupId = group.idGroup;
                         }
-                                           
-                        exampleResult += "If the list does not contain a group named \"test import\", create it<br/>POST "+url1+" - OK<br/>";
-                                           
-                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+
+                        messageResult = "If the list does not contain a group named \"test import\", create it";
+
+                         $(".example1").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, body? body : "", data));
+
                         runExample1Helper();
                     }, function(error) {
-                        document.getElementById("pExampleResultString").innerHTML = error;
+                        messageResult = "If the list does not contain a group, create it";
+                        $(".example1").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, "", ""));
+                        $(".example1").append(jQuery.validator.format(errorAnswer, error));
+                        showImage(imgId, true);
                     });
                 } else runExample1Helper();
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
+                $(".example1").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, "", ""));
+                $(".example1").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
             });
         }
-        
+
         // EXAMPLE 2 - UNSUBSCRIBE A RECIPIENT FROM A GROUP
         function runExample2() {
-            var exampleResult = "";
-            
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img2"; 
+            showImage(imgId, false);
+            $(".example2").children().not(".btn-success, .img").remove();
             // Request for recipient in a group
-            var url = mailUp.getConsoleEndpoint() + "/Console/Group/" + groupId + "/Recipients";
-            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+            var url = "/Console/Group/" + groupId + "/Recipients";
+            messageResult = "Request for recipient in a group";
+            mailUp.callMethod(mailUp.getConsoleEndpoint() + url, "GET", null, "JSON", function(body, data) {
                 var obj = JSON.parse(data);
                 var arr = obj.Items;
-                
+
                 var recipientId = -1;
                 if (arr.length > 0) {
                     recipientId = arr[0].idRecipient;
                 }
-                                           
-                exampleResult += "Request for recipient in a group<br/>GET "+url+" - OK<br/>";
-                                           
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+
+                $(".example2").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, body? body : "", data));
+
                 // Pick up a recipient and unsubscribe it
                 if (recipientId != -1) {
-                    var url1 = mailUp.getConsoleEndpoint() + "/Console/Group/" + groupId + "/Unsubscribe/" + recipientId;
-                    mailUp.callMethod(url1, "DELETE", null, "JSON", function(data) {
-                     
-                        exampleResult += "Pick up a recipient and unsubscribe it<br/>DELETE "+url1+" - OK<br/>";
-                                           
-                        exampleResult += "Example methods completed successfully<br/>";
-                            
-                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                         
+                    var url1 = "/Console/Group/" + groupId + "/Unsubscribe/" + recipientId;
+                    messageResult = "Pick up a recipient and unsubscribe it";
+                    mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "DELETE", null, "JSON", function(body, data) {
+
+                    errorResult = "Example methods completed successfully";
+                    $(".example2").append(jQuery.validator.format(answer, messageResult, "DELETE", "JSON", "Console", url1, body? body : "", data));
+                    $(".example2").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                    showImage(imgId, true);
                     }, function(error) {
-                        document.getElementById("pExampleResultString").innerHTML = error;
+                        $(".example2").append(jQuery.validator.format(answer, messageResult, "DELETE", "JSON", "Console", url1, "", ""));
+                        $(".example2").append(jQuery.validator.format(errorAnswer, error));
+                        showImage(imgId, true);
                     });
                 } else {
-                    exampleResult += "No recipients found<br/>";
-                                           
-                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
+                    errorResult = "No recipients found";
+                    $(".example2").append(jQuery.validator.format(errorAnswer, errorResult));
+                    showImage(imgId, true);
                 }
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
+                $(".example2").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, "", ""));
+                $(".example2").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
             });
         }
-        
+
         // EXAMPLE 3 - UPDATE A RECIPIENT DETAIL
         function runExample3() {
-            var exampleResult = "";
-            
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img3";
+            showImage(imgId, false);
+            $(".example3").children().not(".btn-success, .img").remove();
             // Request for existing subscribed recipients
-            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Recipients/Subscribed";
-            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+            var url = "/Console/List/"+LIST_ID+"/Recipients/Subscribed";
+            messageResult = "Request for existing subscribed recipients";
+            mailUp.callMethod(mailUp.getConsoleEndpoint() + url, "GET", null, "JSON", function(body, data) {
                 var obj = JSON.parse(data);
                 var arr = obj.Items;
-                
-                exampleResult += "Request for existing subscribed recipients<br/>GET "+url+" - OK<br/>";
-                                           
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+
+                $(".example3").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, body? body : "", data));
+
                 if (arr.length > 0) {
                     var recipient = arr[0];
-                    
+
                     if (recipient.Fields.length == 0) {
                         var field = '{"Id":1,"Value":"Updated value","Description":""}';
                         recipient.Fields.push(JSON.parse(field));
@@ -231,350 +389,520 @@ MailUp Demo Client
                         recipient.Fields[0].Value = "Updated value";
                         recipient.Fields[0].Description = "";
                     }
-                    
+
                     // Update the modified recipient
-                    var url1 = mailUp.getConsoleEndpoint() + "/Console/Recipient/Detail";
-                    mailUp.callMethod(url1, "PUT", JSON.stringify(recipient), "JSON", function(data) {
-                     
-                        exampleResult += "Update the modified recipient<br/>PUT "+url1+" - OK<br/>";
-                                           
-                        exampleResult += "Example methods completed successfully<br/>";
-                            
-                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                         
+                    var url1 = "/Console/Recipient/Detail";
+                    messageResult = "Update the modified recipient";
+                    mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "PUT", JSON.stringify(recipient), "JSON", function(body, data) {
+
+                        messageResult = "Update the modified recipient";
+                        errorResult = "Example methods completed successfully";
+                        $(".example3").append(jQuery.validator.format(answer, messageResult, "PUT", "JSON", "Console", url1, body? body : "", data));
+                        $(".example3").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                        showImage(imgId, true);
+
                     }, function(error) {
-                        document.getElementById("pExampleResultString").innerHTML = error;
+                        $(".example3").append(jQuery.validator.format(answer, messageResult, "PUT", "JSON", "Console", url1, "", ""));
+                        $(".example3").append(jQuery.validator.format(errorAnswer, error));
+                        showImage(imgId, true);
                     });
                 }
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
+                $(".example3").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, "", ""));
+                $(".example3").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
             });
         }
-        
+
         // EXAMPLE 4 - CREATE A MESSAGE FROM TEMPLATE
         function runExample4() {
-            var exampleResult = "";
-            
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img4";
+            showImage(imgId, false);
+            $(".example4").children().not(".btn-success, .img").remove();
             // Get the available template list
-            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Templates";
-            mailUp.callMethod(url, "GET", null, "JSON", function (data) {
+            var url = "/Console/List/"+LIST_ID+"/Templates";
+            messageResult = "Get the available template list";
+            mailUp.callMethod(mailUp.getConsoleEndpoint() + url, "GET", null, "JSON", function (body, data) {
 
                 var arr = JSON.parse(data);
 
                 var templateId = -1;
                 if (arr.Items.length > 0) {
                     templateId = arr.Items[1].Id;
-                }   
-                                           
-                exampleResult += "Get the available template list<br/>GET "+url+" - OK<br/>";
-                                           
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+                }
+
+                $(".example4").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, body? body : "", data));
+
                 // Create the new message
-                var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/Template/" + templateId;
-                mailUp.callMethod(url1, "POST", null, "JSON", function (data) {
+                var url1 = "/Console/List/"+LIST_ID+"/Email/Template/" + templateId;
+                messageResult = "Create the new message";
+                mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "POST", null, "JSON", function (body, data) {
 
                     var arr = JSON.parse(data);
-                                       
+
                     if (arr.length > 0) {
                         emailId = arr.idMessage;
                     }
-                     
-                    exampleResult += "Create the new message<br/>POST "+url1+" - OK<br/>";
-                                           
-                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                    
+
+                    $(".example4").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, body? body : "", data));
+
                     // Request for messages list
-                    var url2 = mailUp.getConsoleEndpoint() + "/Console/List/1/Emails";
-                    mailUp.callMethod(url2, "GET", null, "JSON", function(data) {
-                        
-                        exampleResult += "Request for messages list<br/>GET "+url2+" - OK<br/>";
-                                           
-                        exampleResult += "Example methods completed successfully<br/>";
-                            
-                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                         
+                    var url2 = "/Console/List/"+LIST_ID+"/Emails";
+                    messageResult = "Request for messages list";
+                    mailUp.callMethod(mailUp.getConsoleEndpoint() + url2, "GET", null, "JSON", function(body, data) {
+
+                      errorResult = "Example methods completed successfully";
+                      $(".example4").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url2, body? body : "", data));
+                      $(".example4").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                      showImage(imgId, true);
                     }, function(error) {
-                        document.getElementById("pExampleResultString").innerHTML = error;
-                    });                         
+                        $(".example4").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url2, "", ""));
+                        $(".example4").append(jQuery.validator.format(errorAnswer, error));
+                        showImage(imgId, true);
+                    });
                 }, function(error) {
-                    document.getElementById("pExampleResultString").innerHTML = error;
+                    $(".example4").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, "", ""));
+                    $(".example4").append(jQuery.validator.format(errorAnswer, error));
+                    showImage(imgId, true);
                 });
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
+                $(".example4").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, "", ""));
+                $(".example4").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
             });
         }
-        
+
         // EXAMPLE 5 - CREATE A MESSAGE WITH IMAGES AND ATTACHMENTS
         function runExample5() {
-            var exampleResult = "";
-            
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img5";
+            showImage(imgId, false);
+            $(".example5").children().not(".btn-success, .img").remove();
             // Image bytes can be obtained from file, database or any other source
             var base64Image = "iVBORw0KGgoAAAANSUhEUgAAAR4AAACnCAMAAADwpcPtAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAYBQTFRFKSkphYWFeHh4GhoaYWFhJSUlVVVV3t7ePT09XV1doKCgdXV1np6ezMzMrq6upqamxMTEWVlZz8/Po6OjoqKilpaWZ2dnNjY2SEhIbm5usLCwysrKtra2AAAAZWVlvLy8h4eHx8fHqampmpqawsLC1NTUxsbGmJiYlJSUs7OzfHx8nJycRERERkZGiYmJwMDAq6urS0tL0dHRISEhrKysjIyMcnJyj4+PuLi4NDQ0KioqZGRkkJCQTExMODg4urq6kpKSUFBQQEBAU1NTMTExioqKcHBwLCwsCgoKQkJCTk5OOjo6Ly8vgICAgoKCFhYW0tLSLi4ufn5+ERERa2trbGxs2tra7+/v5ubm+vr68fHx+fn5tbW1/Pz8/f394uLi7u7u9PT08PDw+/v75OTk/v7+8/Pz4+Pj8vLy9vb29/f32NjY6+vr3d3d19fX6Ojo5eXl3Nzc7e3t5+fn+Pj49fX14ODgvr6+v7+/7Ozs6enp2dnZ4eHh6urqtLS0////r2s4NAAAAIB0Uk5T/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////wA4BUtnAAAU8klEQVR42uyd+UPaSBvHoxJEFBAtBKyzHuh6YVvWlQoKLZAWLB7r0kWBggoigvd9O//6mwtIQiCJpTV9m/mhRchMnnwy88yTme9MEKimBglREah4VDwqHhWPiuf/DM9lz1Rnh5ZM5s/j3WeSSs3E9W5tKBTSmju7ei7rHZVPSU0XCWXiSf9pnwHstOrr2xMrc9fkIQ+NxGIR8v+ZzrjwcRvIjKSEIohbiXjSExh5eZoF45+nD1eGCYs1TPzd9qZhFUr3tgHgnx0p3CazB4dPb4IEoz+uhI48aZOWUABsL4cnV6/mGnQEi1YDu3EkDi048aU+XbfAYyeItJ5yKokDAcuCTXBbSrq8eA/A3y+G57UnPCH0S2mZ4DC+VfN9boCg5izU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";
 
             // Upload an image
-            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Images";
+            var url = "/Console/List/"+LIST_ID+"/Images";
             var imageRequest = "{\"Base64Data\":\""+base64Image+"\",\"Name\":\"Avatar\"}";
-            mailUp.callMethod(url, "POST", imageRequest, "JSON", function(data) {
-                
-                exampleResult += "Upload an image<br/>POST "+url+" - OK<br/>";
-                                           
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+            messageResult = "Upload an image";
+            mailUp.callMethod(mailUp.getConsoleEndpoint() + url, "POST", imageRequest, "JSON", function(body, data) {
+
+                $(".example5").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url, body? body : "", data));
+
                 // Get the images available
-                var url1 = mailUp.getConsoleEndpoint() + "/Console/Images";
-                mailUp.callMethod(url1, "GET", null, "JSON", function(data) {
+                var url1 = "/Console/Images";
+                messageResult = "Get the images available";
+                mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "GET", null, "JSON", function(body, data) {
                     var arr = JSON.parse(data);
-                    
+
                     var imgSrc = ""
                     if (arr.length > 0) {
                         imgSrc = arr[0];
                     }
-                     
-                    exampleResult += "Get the images available<br/>GET "+url1+" - OK<br/>";
-                                           
-                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                    
+
+                    $(".example5").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url1, body? body : "", data));
+
                     // Create and save "hello" message
                     imgSrc = imgSrc.split("\\").join("\\\\");
                     imgSrc = imgSrc.split("/").join("\\/");
                     var message = "<html><body><p>Hello<\\/p><img src=\\\""+imgSrc+"\\\" \\/><\\/body><\\/html>";
-                    
-                    var email = '{"Subject":"Test Message Objective-C","idList":1,"Content":"'+message+
+
+                    var email = '{"Subject":"Test Message JS","idList":"'+LIST_ID+'","Content":"'+message+
                             '","Embed":true,"IsConfirmation":true,"Fields":[],"Notes":"Some notes","Tags":[],"TrackingInfo":{"CustomParams":"","Enabled":true,"Protocols":["http"]}}';
-                    
-                    var url2 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email";
-                    mailUp.callMethod(url2, "POST", email, "JSON", function (data) {
+
+                    var url2 = "/Console/List/"+LIST_ID+"/Email";
+                    mailUp.callMethod(mailUp.getConsoleEndpoint() + url2, "POST", email, "JSON", function (body, data) {
 
                         var arr = JSON.parse(data);
-                        
+
                         console.log(data.length);
-                        
+
                         if (data.length > 0) {
                             emailId = arr.idMessage;
                         }
-                        
-                        exampleResult += "Create and save \"hello\" message<br/>POST "+url2+" - OK<br/>";
-                                           
-                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                        
+
+                        messageResult = "Create and save \"hello\" message";
+
+                        $(".example5").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url2, body? body : "", data));
+
                         // Add an attachment
                         var attachment = "QmFzZSA2NCBTdHJlYW0="; // Base64 String
-                        var attachmentRequest = "{\"Base64Data\":\""+attachment+"\",\"Name\":\"TestFile.txt\",\"Slot\":1,\"idList\":1,\"idMessage\":"+emailId+"}";
-                        var url3 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId + "/Attachment/1";
-                        mailUp.callMethod(url3, "POST", attachmentRequest, "JSON", function(data) {                                
-                     
-                            exampleResult += "Add an attachment<br/>POST "+url3+" - OK<br/>";
-                                           
-                            document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                    
-                            // Retreive message details
-                            var url4 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId;
-                            mailUp.callMethod(url4, "GET", null, "JSON", function(data) {
-                        
-                                exampleResult += "Retreive message details<br/>GET "+url4+" - OK<br/>";
-                                           
-                                exampleResult += "Example methods completed successfully<br/>";
-                            
-                                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                         
+                        var attachmentRequest = "{\"Base64Data\":\""+attachment+"\",\"Name\":\"TestFile.txt\",\"Slot\":1,\"idList\":"+LIST_ID+",\"idMessage\":"+emailId+"}";
+                        var url3 = "/Console/List/"+LIST_ID+"/Email/" + emailId + "/Attachment/1";
+                        messageResult = "Add an attachment";
+                        mailUp.callMethod(mailUp.getConsoleEndpoint() + url3, "POST", attachmentRequest, "JSON", function(body, data) {
+                                            
+                            $(".example5").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url3, body? body : "", data));
+
+                            // Retrieve message details
+                            var url4 = "/Console/List/"+LIST_ID+"/Email/" + emailId;
+                            messageResult = "Retrieve message details";
+                            mailUp.callMethod(mailUp.getConsoleEndpoint() + url4, "GET", null, "JSON", function(body, data) {
+
+                                errorResult = "Example methods completed successfully";
+                                $(".example5").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url4, body? body : "", data));
+                                $(".example5").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                                showImage(imgId, true);
+
                             }, function(error) {
-                                document.getElementById("pExampleResultString").innerHTML = error;
-                            });                         
+                                $(".example5").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url4, "", ""));
+                                $(".example5").append(jQuery.validator.format(errorAnswer, error));
+                                showImage(imgId, true);
+                            });
                         }, function(error) {
-                            document.getElementById("pExampleResultString").innerHTML = error;
-                        });                         
+                            $(".example5").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url3, "", ""));
+                            $(".example5").append(jQuery.validator.format(errorAnswer, error));
+                            showImage(imgId, true);
+                        });
                     }, function(error) {
-                        document.getElementById("pExampleResultString").innerHTML = error;
-                    });                         
+                        messageResult = "Create and save message";
+                        $(".example5").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url2, "", ""));
+                        $(".example5").append(jQuery.validator.format(errorAnswer, error));
+                        showImage(imgId, true);
+                    });
                 }, function(error) {
-                    document.getElementById("pExampleResultString").innerHTML = error;
+                    $(".example5").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url1, "", ""));
+                    $(".example5").append(jQuery.validator.format(errorAnswer, error));
+                    showImage(imgId, true);
                 });
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
+                $(".example5").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url, "", ""));
+                $(".example5").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
             });
         }
-        
+
         // EXAMPLE 6 - TAG A MESSAGE
         function runExample6() {
-            var exampleResult = "";
-            
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img6";
+            showImage(imgId, false);
+            $(".example6").children().not(".btn-success, .img").remove();
             // Create a new tag
-            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Tag";
-            mailUp.callMethod(url, "POST", "\"test tag\"", "JSON", function(data) {
+            var url = "/Console/List/"+LIST_ID+"/Tag";
+            messageResult = "Create a new tag";
+            mailUp.callMethod(mailUp.getConsoleEndpoint() + url, "POST", "\"test tag\"", "JSON", function(body, data) {
                 var arr = JSON.parse(data);
-                
+
                 var tagId = -1;
                 if (arr.length > 0) {
                     tagId = arr[0].Id;
                 }
-                                           
-                exampleResult += "Create a new tag<br/>POST "+url+" - OK<br/>";
-                                           
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+
+                $(".example6").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url, body? body : "", data));
+
                 // Pick up a message and retrieve detailed informations
-                var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId;
-                mailUp.callMethod(url1, "GET", null, "JSON", function(data) {
+                var url1 = "/Console/List/"+LIST_ID+"/Email/" + emailId;
+                messageResult = "Pick up a message and retrieve detailed informations";
+                mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "GET", null, "JSON", function(body, data) {
                     var obj = JSON.parse(data);
-                    
-                    exampleResult += "Pick up a message and retrieve detailed informations<br/>GET "+url1+" - OK<br/>";
-                                           
-                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                    
+
+                    $(".example6").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url1, body? body : "", data));
+
                     // Add the tag to the message details and save
                     var tags = '[{"Id":'+tagId+',"Enabled":true,"Name":"test tag"}]';
                     obj.Tags = JSON.parse(tags);
-                    
-                    var url2 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId;
-                    mailUp.callMethod(url2, "PUT", JSON.stringify(obj), "JSON", function(data) {
-                        
-                        exampleResult += "Add the tag to the message details and save<br/>PUT "+url2+" - OK<br/>";
-                                           
-                        exampleResult += "Example methods completed successfully<br/>";
-                            
-                        document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                         
+
+                    var url2 = "/Console/List/"+LIST_ID+"/Email/" + emailId;
+                    messageResult = "Add the tag to the message details and save";
+                    mailUp.callMethod(mailUp.getConsoleEndpoint() + url2, "PUT", JSON.stringify(obj), "JSON", function(body, data) {
+
+                        errorResult = "Example methods completed successfully";
+                        $(".example6").append(jQuery.validator.format(answer, messageResult, "PUT", "JSON", "Console", url2, body? body : "", data));
+                        $(".example6").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                        showImage(imgId, true);
+
                     }, function(error) {
-                        document.getElementById("pExampleResultString").innerHTML = error;
-                    });                         
+                        $(".example6").append(jQuery.validator.format(answer, messageResult, "PUT", "JSON", "Console", url2, "", ""));
+                        $(".example6").append(jQuery.validator.format(errorAnswer, error));
+                        showImage(imgId, true);
+                    });
                 }, function(error) {
-                    document.getElementById("pExampleResultString").innerHTML = error;
+                    $(".example6").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url1, "", ""));
+                    $(".example6").append(jQuery.validator.format(errorAnswer, error));
+                    showImage(imgId, true);
                 });
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
-            });            
+                $(".example6").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url, "", ""));
+                $(".example6").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
+            });
         }
-        
+
         // EXAMPLE 7 - SEND A MESSAGE
         function runExample7() {
-            var exampleResult = "";
-            
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img7";
+            showImage(imgId, false);
+            $(".example7").children().not(".btn-success, .img").remove();
             // Get the list of the existing messages
-            var url = mailUp.getConsoleEndpoint() + "/Console/List/1/Emails";
-            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
+            var url = "/Console/List/"+LIST_ID+"/Emails";
+            messageResult = "Get the list of the existing messages";
+            mailUp.callMethod(mailUp.getConsoleEndpoint() + url, "GET", null, "JSON", function(body, data) {
                 var obj = JSON.parse(data);
                 var arr = obj.Items;
-                
+
                 if (arr.length > 0) {
                     emailId = arr[0].idMessage;
                 }
-                                           
-                exampleResult += "Get the list of the existing messages<br/>GET "+url+" - OK<br/>";
-                                           
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                                           
+
+                $(".example7").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, body? body : "", data));
+
                 // Send email to all recipients in the list
-                var url1 = mailUp.getConsoleEndpoint() + "/Console/List/1/Email/" + emailId + "/Send";
-                mailUp.callMethod(url1, "POST", null, "JSON", function(data) {
-                     
-                    exampleResult += "Send email to all recipients in the list<br/>POST "+url1+" - OK<br/>";
-                                           
-                    exampleResult += "Example methods completed successfully<br/>";
-                        
-                    document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                         
+                var url1 = "/Console/List/"+LIST_ID+"/Email/" + emailId + "/Send";
+                messageResult = "Send email to all recipients in the list";
+                mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "POST", null, "JSON", function(body, data) {
+
+                    errorResult = "Example methods completed successfully";
+                    $(".example7").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, body? body : "", data)); 
+                    $(".example7").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                    showImage(imgId, true);
+
                 }, function(error) {
-                    document.getElementById("pExampleResultString").innerHTML = error;
+                    $(".example7").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, "", ""));
+                    $(".example7").append(jQuery.validator.format(errorAnswer, error));
+                    showImage(imgId, true);
                 });
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
+                $(".example7").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, "", ""));
+                $(".example7").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
             });
         }
-        
+
         // EXAMPLE 8 - DISPLAY STATISTICS FOR A MESSAGE SENT AT EXAMPLE 7
         function runExample8() {
-            var exampleResult = "";
-            
-            // Request (to MailStatisticsService.svc) for paged message views list for the previously sent message
+            var messageResult = "";
+            var errorResult = "";
+            var imgId = "img8";
+            showImage(imgId, false);
+            $(".example8").children().not(".btn-success, .img").remove();
+
             var hours = 4;
-            var url = mailUp.getMailstatisticsEndpoint() + "/Message/" + emailId + "/List/Views?pageSize=5&pageNum=0";
-            mailUp.callMethod(url, "GET", null, "JSON", function(data) {
-                
-                exampleResult += "Request (to MailStatisticsService.svc) for paged message views list for the previously sent message<br/>GET "+url+" - OK<br/>";
-                                           
-                exampleResult += "Example methods completed successfully<br/>";
-                        
-                document.getElementById("pExampleResultString").innerHTML = exampleResult;
-                
+            var url = "/Message/" + emailId + "/List/Views?pageSize=5&pageNum=0";
+            messageResult = "Request (to MailStatisticsService.svc) for paged message views list for the previously sent message";
+            mailUp.callMethod(mailUp.getMailstatisticsEndpoint() + url, "GET", null, "JSON", function(body, data) {
+
+                errorResult = "Example methods completed successfully";
+                $(".example8").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, body? body : "", data));
+                $(".example8").append(jQuery.validator.format(successfullyAnswer, errorResult));
+                showImage(imgId, true);
+
             }, function(error) {
-                document.getElementById("pExampleResultString").innerHTML = error;
+                $(".example8").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url, "", ""));
+                $(".example8").append(jQuery.validator.format(errorAnswer, error));
+                showImage(imgId, true);
             });
-            
         }
-        
+
     </script>
-<p>
-<input type="button" OnClick="logOn();" id="LogOn" value="Sign in to MailUp"/>
-</p>
-<p>
-Username: <input type="text" id="txtUsr" value="type your MailUp username" style="width:400px;"/><br/>
-Password: <input type="text" id="txtPwd" value="type your MailUp password" style="width:400px;"/><br/>
-<input type="button" OnClick="logOnWithUsernamePassword();" value="Sign in to MailUp using Password flow"/>
-</p>
 
-<p id="pAuthorization">Unauthorized</p><br /><br />
+    <h3><strong>Authentication</strong></h3>
+    <div class="row">
+        <div class="col-sm-3">
+            <div class="panel panel-default auth-panel">
+                <div class="panel-heading">Authorization code grant</div>
+                <div class="panel-body">
+                    <div class="auth-panel-sign">
+                        <button type="submit" class="btn btn-default" OnClick="logOn();" name="LogOn">Sign in to MailUp</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-9">
+            <div class="panel panel-default auth-panel">
+                <div class="panel-heading">Password grant</div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <label for="txtUsr">Username:</label>
+                        <input type="text" id="txtUsr" class="form-control" placeholder="type your MailUp username" name="txtUsr" onkeyup="check();">
+                    </div>
+                    <div class="form-group">
+                        <label for="txtPwd">Password:</label>
+                        <input type="text" id="txtPwd" class="form-control" placeholder="type your MailUp password" name="txtPwd" onkeyup="check();">
+                    </div>
+                    <button type="submit" id="LogOnWithUsernamePassword" class="btn btn-success" OnClick="logOnWithUsernamePassword();" name="LogOnWithUsernamePassword" disabled>Sign in to MailUp with username and password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-sm-10">
+            <div id="pAuthorization" class = "example-body" style="margin-top: 15px;"></div>
+            <div id="showExpiresInTimer"><strong>Expires in </strong><span id="expiresInTimer"></span></div>
+        </div>
+        <div class="col-sm-2 right">
+            <button type="submit" class="btn btn-success" OnClick="getRefreshToken()" id="refreshToken">Refresh token</button>
+        </div>
+    </div>
 
-<p><b>Custom method call</b></p>
-<table>
-<thead>
-<td>Verb</td>
-<td>Content-Type</td>
-<td>Endpoint</td>
-<td>Path</td>
-</thead>
-<tr>
-    <td><select id="lstVerb">
-        <option selected value="GET">GET</option>
-        <option value="POST">POST</option>
-        <option value="PUT">PUT</option>
-        <option value="DELETE">DELETE</option>
-    </select></td>
-    <td><select id="lstContentType">
-        <option selected value="JSON">JSON</option>
-        <option value="XML">XML</option>
-    </select></td>
-    <td><select id="lstEndpoint">
-        <option selected >Console</option>
-        <option >MailStatistics</option>
-    </select></td>
-<td><input type="text" id="txtPath" value="/Console/Authentication/Info" style="width:200px;"/></td>
-</tr>
-</table>
-
-<p>Body</p><p><textarea id="txtBody" rows="5" cols="60"></textarea></p>
-<p>
-<input type="button" OnClick="callMethod();" id="CallMethod" value="Call Method"/>
-</p>
-
-<p id="pResultString"></p><br /><br />
-
-<p><b>Run example set of calls</b></p>
-
-<p id="pExampleResultString"></p>
-<p>
-<input type="button" onclick="runExample1();" id="RunExample1" value="Run example code 1 - Import recipients"/>
-</p>
-<p>
-<input type="button" onclick="runExample2();" id="RunExample2" value="Run example code 2 - Unsubscripe a recipient"/>
-</p>
-<p>
-<input type="button" onclick="runExample3();" id="RunExample3" value="Run example code 3 - Update a recipient"/>
-</p>
-<p>
-<input type="button" onclick="runExample4();" id="RunExample4" value="Run example code 4 - Create a message from template"/>
-</p>
-<p>
-<input type="button" onclick="runExample5();" id="RunExample5" value="Run example code 5 - Create a message from scratch"/>
-</p>
-<p>
-<input type="button" onclick="runExample6();" id="RunExample6" value="Run example code 6 - Tag a message"/>
-</p>
-<p>
-<input type="button" onclick="runExample7();" id="RunExample7" value="Run example code 7 - Send a message"/>
-</p>
-<p>
-<input type="button" onclick="runExample8();" id="RunExample8" value="Run example code 8 - Retreive statistics"/>
-</p>
+    <h3><strong>Custom method call</strong></h3>
+    <div class = "panel panel-default">
+        <div class="panel-body">
+            <div class="form-group row">
+                <div class="col-xs-2">
+                    <label for="lstVerb">Verb</label>
+                    <select id="lstVerb" name="lstVerb" class="form-control">
+                        <option selected value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                </div>
+                <div class="col-xs-2">
+                    <label for="lstContentType">Content-Type</label>
+                    <select id="lstContentType" name="lstContentType" class="form-control">
+                        <option selected value="JSON">JSON</option>
+                        <option value="XML">XML</option>
+                    </select>
+                </div>
+                <div class="col-xs-2">
+                    <label for="lstEndpoint">Endpoint</label>
+                    <select id="lstEndpoint" name="lstEndpoint" class="form-control">
+                        <option selected value="https://services.mailup.com/API/v1.1/Rest/ConsoleService.svc">Console</option>
+                        <option value="https://services.mailup.com/API/v1.1/Rest/MailStatisticsService.svc">MailStatistics</option>
+                    </select>
+                </div>
+                <div class="col-xs-6">
+                    <label for="txtPath">Path</label>
+                    <input type="text" id="txtPath" name="txtPath" value="/Console/Authentication/Info" class="form-control">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="txtBody">Body</label>
+                <textarea id="txtBody" class="form-control" rows="5" cols="60" name="txtBody"></textarea>
+            </div>
+            <button type="submit" id="CallMethod" name="CallMethod" OnClick="callMethod();" class="btn btn-success">Call Method</button>
+            <p id="pResultString" style="margin-top: 15px;">
+            </p>
+        </div>
+    </div>
+    <h3><strong>Run example set of calls</strong></h3>
+    <div class="panel-group" id="runExample1Block1">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample1">Run example code 1 - Import recipients</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample1" class="panel-collapse collapse">
+                <div class="example1">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample1" name="RunExample1" class="btn btn-success" onclick="runExample1();">Run example code 1 - Import recipients</button>
+                    <img src="resources/images/loading.gif" id="img1" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-group" id="runExample1Block2">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample2">Run example code 2 - Unsubscribe a recipient</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample2" class="panel-collapse collapse">
+                <div class="example2">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample2" name="RunExample2" class="btn btn-success" onclick="runExample2();">Run example code 2 - Unsubscribe a recipient</button>
+                    <img src="resources/images/loading.gif" id="img2" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-group" id="runExample1Block3">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample3">Run example code 3 - Update a recipient</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample3" class="panel-collapse collapse ">
+                <div class="example3">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample3" name="RunExample3" class="btn btn-success" onclick="runExample3();">Run example code 3 - Update a recipient</button>
+                    <img src="resources/images/loading.gif" id="img3" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-group" id="runExample1Block4">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample4">Run example code 4 - Create a message from template</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample4" class="panel-collapse collapse ">
+                <div class="example4">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample4" name="RunExample4" class="btn btn-success" onclick="runExample4();">Run example code 4 - Create a message from template</button>
+                    <img src="resources/images/loading.gif" id="img4" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-group" id="runExample1Block5">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample5">Run example code 5 - Create a message from scratch</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample5" class="panel-collapse collapse ">
+                <div class="example5">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample5" name="RunExample5" class="btn btn-success" onclick="runExample5();">Run example code 5 - Create a message from scratch</button>
+                    <img src="resources/images/loading.gif" id="img5" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-group" id="runExample1Block6">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample6">Run example code 6 - Tag a message</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample6" class="panel-collapse collapse ">
+                <div class="example6">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample6" name="RunExample6" class="btn btn-success" onclick="runExample6();">Run example code 6 - Tag a message</button>
+                    <img src="resources/images/loading.gif" id="img6" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-group" id="runExample1Block7">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample7">Run example code 7 - Send a message</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample7" class="panel-collapse collapse ">
+                <div class="example7">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample7" name="RunExample7" class="btn btn-success" onclick="runExample7();">Run example code 7 - Send a message</button>
+                    <img src="resources/images/loading.gif" id="img7" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="panel-group" id="runExample1Block8&quot;&quot;">
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h4 class="panel-title">
+                    <a data-toggle="collapse" href="#collapseRunExample8">Run example code 8 - Retrieve statistics</a>
+                </h4>
+            </div>
+            <div id="collapseRunExample8" class="panel-collapse collapse ">
+                <div class="example8">
+                    <button type="submit" style="margin-top: 10px; margin-left:15px; margin-bottom:10px;" id="RunExample8" name="RunExample8" class="btn btn-success" onclick="runExample8();">Run example code 8 - Retrieve statistics</button>
+                    <img src="resources/images/loading.gif" id="img8" class="img" alt="" hidden/>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 </body>
 </html>
