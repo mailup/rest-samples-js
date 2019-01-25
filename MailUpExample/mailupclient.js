@@ -12,6 +12,7 @@ function MailUpClient(inClientId, inClientSecret, inCallbackUri) {
     this.callbackUri = inCallbackUri;
     this.accessToken = "";
     this.refreshToken = "";
+    this.expiresIn = 0;
 
     this.loadToken();
 }
@@ -103,6 +104,22 @@ MailUpClient.prototype.setMailstatisticsEndpoint = function(value) {
     return this.mailstatisticsEndpoint = value;
 }
 
+MailUpClient.prototype.getAccessToken1 = function() {
+    return this.accessToken;
+}
+
+MailUpClient.prototype.setAccessToken1 = function(value) {
+    return this.accessToken = value;
+}
+
+MailUpClient.prototype.getExpiresIn = function() {
+    return this.expiresIn;
+}
+
+MailUpClient.prototype.setExpiresIn = function(value) {
+    return this.expiresIn = value;
+}
+
 MailUpClient.prototype.getLogOnUri = function() {
     var url = this.getLogonEndpoint() + "?client_id=" + this.clientId + "&client_secret=" + this.clientSecret + "&response_type=code&redirect_uri=" + this.callbackUri;
     return url;
@@ -126,7 +143,9 @@ MailUpClient.prototype.retreiveAccessTokenWithCode = function(code, onSuccess, o
             if (request.status == 200) {
 		var result = JSON.parse(request.responseText);
 		m.accessToken = result.access_token;
-		m.refreshToken = result.refresh_token;
+        m.refreshToken = result.refresh_token;
+        m.expiresIn = result.expires_in;
+        m.saveToken();
 		onSuccess(m.accessToken);
             } else {
 		onError("Error code "+request.status);
@@ -147,7 +166,8 @@ MailUpClient.prototype.retreiveAccessToken = function(login, password, onSuccess
             if (request.status == 200 || request.status == 302) {
 				var result = JSON.parse(request.responseText);
 				m.accessToken = result.access_token;
-				m.refreshToken = result.refresh_token;
+                m.refreshToken = result.refresh_token;
+                m.expiresIn = result.expires_in;
 				m.saveToken();
 				onSuccess(m.accessToken);
             } else {
@@ -177,7 +197,9 @@ MailUpClient.prototype.refreshAccessToken = function(onSuccess, onError) {
             if (request.status == 200 || request.status == 302) {
 		var result = JSON.parse(request.responseText);
 		m.accessToken = result.access_token;
-		m.refreshToken = result.refresh_token;
+        m.refreshToken = result.refresh_token;
+        m.expiresIn = result.expires_in;
+        m.saveToken();
 		onSuccess(m.accessToken);
             } else {
 		onError("Error code "+request.status);
@@ -186,7 +208,7 @@ MailUpClient.prototype.refreshAccessToken = function(onSuccess, onError) {
     };
     request.open("POST", url, true);
     request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
-    request.setRequestHeader("Content-Length", body.length);
+  //  request.setRequestHeader("Content-Length", body.length);
     request.send(body);
 }
 
@@ -200,13 +222,13 @@ MailUpClient.prototype.callMethodInternal = function(url, verb, body, contentTyp
     request.onreadystatechange = function() {
         if (request.readyState == 4) {
             if (request.status == 200) {
-                onSuccess(request.responseText);
+                onSuccess(body, request.responseText);
             } else if (request.status == 401 && refresh == true) {
                 m.refreshAccessToken(function() {
                     m.callMethodInternal(url, verb, body, contentType, false, onSuccess, onError);
                 }, onError);
             } else {
-                onError("Error code "+request.status);
+                onError("Error code "+request.status+ " for URL: " + request.responseURL);
             }
         }
     };
@@ -215,10 +237,10 @@ MailUpClient.prototype.callMethodInternal = function(url, verb, body, contentTyp
     request.setRequestHeader("Accept", contentType=="XML"?"application/xml":"application/json");
     request.setRequestHeader("Authorization", "Bearer " + this.accessToken);
     if (body != null && body != "") {
-        request.setRequestHeader("Content-Length", body.length);
+      //  request.setRequestHeader("Content-Length", body.length);
         request.send(body);
     } else {
-        request.setRequestHeader("Content-Length", "0");
+      //  request.setRequestHeader("Content-Length", "0");
         request.send(null);
     }
 }
@@ -232,13 +254,10 @@ MailUpClient.prototype.loadToken = function() {
 }
 
 MailUpClient.prototype.saveToken = function() {
-    var exdate=new Date();
-    exdate.setDate(exdate.getDate() + 30);
-    document.cookie = "access_token="+this.accessToken+"; expires="+exdate.toUTCString();
-    document.cookie = "refresh_token="+this.refreshToken+"; expires="+exdate.toUTCString();
+    var exdate = new Date();
+    exdate = exdate.getTime() + this.expiresIn * 1000;
+
+    document.cookie = "access_token="+this.accessToken+"; expires="+(new Date(exdate)).toUTCString();
+    document.cookie = "refresh_token="+this.refreshToken+"; expires="+(new Date(exdate)).toUTCString();
+    document.cookie = "access_token_expire="+ exdate +"; expires="+(new Date(exdate)).toUTCString();
 }
-
-
-
-
-
