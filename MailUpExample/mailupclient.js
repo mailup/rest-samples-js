@@ -158,7 +158,7 @@ MailUpClient.prototype.retreiveAccessTokenWithCode = function(code, onSuccess, o
 
 MailUpClient.prototype.retreiveAccessToken = function(login, password, onSuccess, onError) {
     var url = this.getTokenEndpoint();
-    var body = "grant_type=password&client_id=" + this.clientId + "&client_secret=" + this.clientSecret + "&username=" + login + "&password=" + password;
+    var body = "grant_type=password&client_id=" + this.clientId + "&client_secret=" + this.clientSecret + "&username=" + encodeURIComponent(login) + "&password=" + encodeURIComponent(password);
 	var request = this.getAjax();
     var m = this;
     request.onreadystatechange = function() {
@@ -177,7 +177,7 @@ MailUpClient.prototype.retreiveAccessToken = function(login, password, onSuccess
     };
 	request.open("POST", url, true);
     request.setRequestHeader("Authorization", "Basic " + this.base64_encode( this.clientId+":"+this.clientSecret));
-	request.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
+    request.setRequestHeader("Content-Type","application/x-www-form-urlencoded");
     if (body != null && body != "") {
         request.send(body);
     } else {
