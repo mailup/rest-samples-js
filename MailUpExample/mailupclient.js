@@ -6,7 +6,7 @@ function MailUpClient(inClientId, inClientSecret, inCallbackUri) {
     this.tokenEndpoint = "https://services.mailup.com/Authorization/OAuth/Token";
     this.consoleEndpoint = "https://services.mailup.com/API/v1.1/Rest/ConsoleService.svc";
     this.mailstatisticsEndpoint = "https://services.mailup.com/API/v1.1/Rest/MailStatisticsService.svc";
-        
+
     this.clientId = inClientId;
     this.clientSecret = inClientSecret;
     this.callbackUri = inCallbackUri;
@@ -63,43 +63,43 @@ MailUpClient.prototype.getAjax = function() {
     } else if (window.XMLHttpRequest) return new XMLHttpRequest();
     else return false;
 }
- 
+
 MailUpClient.prototype.getLogonEndpoint = function() {
     return this.logonEndpoint;
 }
- 
+
 MailUpClient.prototype.setLogonEndpoint = function(value) {
     return this.logonEndpoint = value;
 }
- 
+
 MailUpClient.prototype.getAuthorizationEndpoint = function() {
     return this.authorizationEndpoint;
 }
- 
+
 MailUpClient.prototype.setAuthorizationEndpoint = function(value) {
     return this.authorizationEndpoint = value;
 }
- 
+
 MailUpClient.prototype.getTokenEndpoint = function() {
     return this.tokenEndpoint;
 }
- 
+
 MailUpClient.prototype.setTokenEndpoint = function(value) {
     return this.tokenEndpoint = value;
 }
- 
+
 MailUpClient.prototype.getConsoleEndpoint = function() {
     return this.consoleEndpoint;
 }
- 
+
 MailUpClient.prototype.setConsoleEndpoint = function(value) {
     return this.consoleEndpoint = value;
 }
- 
+
 MailUpClient.prototype.getMailstatisticsEndpoint = function() {
     return this.mailstatisticsEndpoint;
 }
- 
+
 MailUpClient.prototype.setMailstatisticsEndpoint = function(value) {
     return this.mailstatisticsEndpoint = value;
 }
@@ -131,10 +131,10 @@ MailUpClient.prototype.logOn = function() {
 }
 
 MailUpClient.prototype.logOnWithUsernamePassword = function(username,password,onSuccess,onError) {
-    this.retreiveAccessToken(username,password,onSuccess,onError);
+    this.retrieveAccessToken(username,password,onSuccess,onError);
 }
 
-MailUpClient.prototype.retreiveAccessTokenWithCode = function(code, onSuccess, onError) {
+MailUpClient.prototype.retrieveAccessTokenWithCode = function(code, onSuccess, onError) {
     var url = this.getTokenEndpoint() + "?code=" + code + "&grant_type=authorization_code";
     var request = this.getAjax();
     var m = this;
@@ -156,7 +156,7 @@ MailUpClient.prototype.retreiveAccessTokenWithCode = function(code, onSuccess, o
     request.send(null);
 }
 
-MailUpClient.prototype.retreiveAccessToken = function(login, password, onSuccess, onError) {
+MailUpClient.prototype.retrieveAccessToken = function(login, password, onSuccess, onError) {
     var url = this.getTokenEndpoint();
     var body = "grant_type=password&client_id=" + this.clientId + "&client_secret=" + this.clientSecret + "&username=" + encodeURIComponent(login) + "&password=" + encodeURIComponent(password);
 	var request = this.getAjax();
@@ -183,7 +183,7 @@ MailUpClient.prototype.retreiveAccessToken = function(login, password, onSuccess
     } else {
         request.send(null);
     }
-	
+
 }
 
 MailUpClient.prototype.refreshAccessToken = function(onSuccess, onError) {
