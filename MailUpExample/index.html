@@ -62,7 +62,7 @@ $(function () {
             var param = params[i].split("=");
             if (param[0]=="code") { // We have code returned from MailUp
                 var code = param[1];
-                mailUp.retreiveAccessTokenWithCode(code, function(token) {
+                mailUp.retrieveAccessTokenWithCode(code, function(token) {
                     authorized(token);
                     isToken(token);
                     expireTimer();
@@ -74,7 +74,7 @@ $(function () {
 
         function Init(){
             var opt = document.getElementById("lstEndpoint").options;
-            var getToken = mailUp.getAccessToken1();		
+            var getToken = mailUp.getAccessToken1();
 		    opt[1].value = mailUp.getMailstatisticsEndpoint();
             opt[0].value = mailUp.getConsoleEndpoint();
             if (getToken == "") {
@@ -199,7 +199,7 @@ $(function () {
             if (accessTokenExpire) {
                 timer = (accessTokenExpire - (new Date()).getTime()) / 1000;
                 if (refreshInterval != 0) {
-                    clearInterval(refreshInterval); 
+                    clearInterval(refreshInterval);
                 }
                 startTimer(timer, document.querySelector('#expiresInTimer'));
             } else {
@@ -247,7 +247,7 @@ $(function () {
                         var url4 = "/Console/Import/" + importId;
                         messageResult = "Check the import result";
                         mailUp.callMethod(mailUp.getConsoleEndpoint() + url4, "GET", null, "JSON", function(body, data) {
-                            
+
                             errorResult = "Example methods completed successfully";
                             $(".example1").append(jQuery.validator.format(answer, messageResult, "GET", "JSON", "Console", url4, body? body : "", data));
                             $(".example1").append(jQuery.validator.format(successfullyAnswer, errorResult));
@@ -318,7 +318,7 @@ $(function () {
         function runExample2() {
             var messageResult = "";
             var errorResult = "";
-            var imgId = "img2"; 
+            var imgId = "img2";
             showImage(imgId, false);
             $(".example2").children().not(".btn-success, .img").remove();
             // Request for recipient in a group
@@ -534,7 +534,7 @@ $(function () {
                         var url3 = "/Console/List/"+LIST_ID+"/Email/" + emailId + "/Attachment/1";
                         messageResult = "Add an attachment";
                         mailUp.callMethod(mailUp.getConsoleEndpoint() + url3, "POST", attachmentRequest, "JSON", function(body, data) {
-                                            
+
                             $(".example5").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url3, body? body : "", data));
 
                             // Retrieve message details
@@ -659,7 +659,7 @@ $(function () {
                 mailUp.callMethod(mailUp.getConsoleEndpoint() + url1, "POST", null, "JSON", function(body, data) {
 
                     errorResult = "Example methods completed successfully";
-                    $(".example7").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, body? body : "", data)); 
+                    $(".example7").append(jQuery.validator.format(answer, messageResult, "POST", "JSON", "Console", url1, body? body : "", data));
                     $(".example7").append(jQuery.validator.format(successfullyAnswer, errorResult));
                     showImage(imgId, true);
 
